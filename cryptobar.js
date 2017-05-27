@@ -1,163 +1,32 @@
 #!/usr/bin/env /usr/local/bin/node
 
 const bitbar = require("bitbar");
-const KrakenClient = require("kraken-api")
-const PoloniexClient = require("poloniex-api-node");
-const bittrex = require("node.bittrex.api");
 const getExchangeRates = require("get-exchange-rates");
-const async = require("async");
+const bittrex = require("node.bittrex.api");
+const table = require("text-table");
+const jsonfile = require('jsonfile');
+
 const config = require("./config");
 
-const FONT = 'Monaco';
+const FONT = 'Fira Code';
+const SIZE = 13;
 //color
 const COLOR_GREY = '#848484';
-const COLOR_RED = '#ff3d38';
-const COLOR_GREEN = '#31B404';
-const COLOR_BLUE = '#0000FF';
-const COLOR_WHITE = '#FFFFFF';
-const SMALL_SIZE = 12;
+const COLOR_WHITE = '#dcdee0';
 
 let arrayBitBar = [{
     text: "🤑",
     dropdown: false
-}]
-
-arrayBitBar.push(bitbar.sep);
+},
+bitbar.sep]
 
 var totalInBTC = 0;
+var coins = {}
 
-let kraken;
-let poloniex;
-
-let promises = []
+var old = jsonfile.readFileSync(config.cache, { throws: false })
+if (!old) old = {}
 
 getExchangeRates().then(rates => {
-    if (config.platforms.hasOwnProperty("kraken")) {
-        kraken = new KrakenClient(config.platforms.kraken.key, config.platforms.kraken.secret);
-
-        /*Show the current currency you're holding, and how much BTC there worth
-        in the current format:
-        ISONAME amount valueInBTC
-        */
-        promises.push(new Promise((resolve, reject) => {
-            var arrayKraken = [];
-
-            arrayKraken.push({
-                text: 'Kraken',
-                color: COLOR_RED,
-                font: FONT
-            });
-
-            async.series([
-                (callback) => {
-                    kraken.api("TradeBalance", { asset: config.platforms.kraken.defaultCurrency }, (err, data) => {
-                        arrayKraken[0].text += ` (${parseFloat(data.result.eb).toFixed(2)}€)`;
-                        callback(null);
-                    });
-                },
-                (callback) => {
-                    kraken.api("Balance", null, (err, result) => {
-                        if (err) { reject(err) }
-                        else {
-                            result = result.result;
-
-                            let balances = [];
-                            for (var key in result) {
-                                //Filter only the one with something on it
-                                if (parseFloat(result[key]) > 0 && key !== "XXBT") {
-                                    balances.push({
-                                        name: key, // ISO code for the currency
-                                        value: result[key] // how much you have of this currency
-                                    });
-                                }
-                            }
-                            //Get pair with BTC for each currency in balance
-                            var pairs = {}
-                            balances.forEach(b => {
-                                pairs[b.name] = b.name + "XXBT";
-                            });
-
-                            // Query Tickers for each pairs
-                            kraken.api("Ticker", { pair: Object.keys(pairs).map(k => pairs[k]).join(",") }, (err, tickers) => {
-                                if (err) { reject(err) }
-                                else {
-                                    tickers = tickers.result;
-                                    balances.forEach(b => {
-                                        let average = tickers[pairs[b.name]].p[0] // volume weighted average price today
-                                        let averageLast24 = tickers[pairs[b.name]].p[1] // volume weighted average price for last 24H
-                                        let btcValue = parseFloat(average) * parseFloat(b.value); //How much BTC you have for this currency
-
-                                        // let percentageUpdate = ((average - averageLast24)/averageLast24)*100; // % change
-                                        // percentageUpdate = percentageUpdate.toFixed(2); // trunc float to 2 number after dot
-                                        totalInBTC += parseFloat(btcValue);
-                                        arrayKraken.push({
-                                            text: `${b.name} ${b.value} = ${btcValue}₿`,
-                                            color: COLOR_WHITE,
-                                            font: FONT,
-                                            size: SMALL_SIZE
-                                        });
-                                    });
-
-                                    callback(null);
-                                }
-                            })
-                        }
-                    })
-                }
-            ], (err, result) => {
-                resolve(arrayKraken);
-            })
-        }));
-    }
-
-    if (config.platforms.hasOwnProperty("poloniex")) {
-        poloniex = new PoloniexClient(config.platforms.poloniex.key, config.platforms.poloniex.secret);
-
-        promises.push(new Promise((resolve, reject) => {
-            var arrayPolo = [];
-            var totalPolo = 0;
-            //Get your current balances
-            poloniex.returnCompleteBalances(null, (err, result) => {
-                if (err) { reject(err) }
-                else {
-                    arrayPolo.push(bitbar.sep);
-                    arrayPolo.push({
-                        text: 'Poloniex',
-                        color: COLOR_GREEN,
-                        font: FONT
-                    });
-
-                    let balances = []
-                    for (var key in result) {
-                        if (result[key].available > 0.0) {
-                            balances.push({
-                                name: key,
-                                value: result[key].available,
-                                btc: result[key].btcValue
-                            });
-                        }
-                    }
-
-                    balances.forEach(b => {
-                        totalInBTC += parseFloat(b.btc);
-                        totalPolo += parseFloat(b.btc);
-                        arrayPolo.push({
-                            text: `${b.name} ${b.value} = ${b.btc}₿`,
-                            color: COLOR_WHITE,
-                            font: FONT,
-                            size: SMALL_SIZE
-                        });
-                    });
-
-                    var euros = (totalPolo / rates.BTC).toFixed(2);
-                    arrayPolo[1].text += ` (${euros}€)`;
-
-                    resolve(arrayPolo);
-                }
-            });
-        }));
-    }
-
     if (config.platforms.hasOwnProperty("bittrex")) {
         bittrex.options({
             apikey: config.platforms.bittrex.key,
@@ -167,99 +36,188 @@ getExchangeRates().then(rates => {
             cleartext: false
         });
 
-        promises.push(new Promise((resolve, reject) => {
-            var arrayBittrex = []
-            var totalBittrex = 0;
+        return new Promise((resolve, reject) => {
+            bittrex.getbalances(dataBalances => {
+                var balances = dataBalances.result
+                bittrex.getmarketsummaries(dataMarkets => {
+                    var markets = dataMarkets.result
+                    balances.forEach(balance => {
+                        let market = markets.find(m => m.MarketName === "BTC-" + balance.Currency)
+                        coins[balance.Currency] = {
+                            name: balance.Currency,
+                            qtyCur: balance.Balance,
+                            avgBuy: 0,
+                            qtyBuy: 0,
+                            lastBuy: 0,
+                            lastQty: 0,
+                            price: 1,
+                            bid: 1,
+                            ask: 1,
+                            orders: 0,
+                            volume: 0,
+                            prev: 1,
+                            high: 0,
+                            low: 0
+                        }
+                        if (balance.Currency !== "BTC") {
+                            coins[balance.Currency].price = market.Bid
+                            coins[balance.Currency].bid = market.Bid
+                            coins[balance.Currency].ask = market.Ask
+                            coins[balance.Currency].volume = market.BaseVolume
+                            coins[balance.Currency].prev = market.PrevDay
+                            coins[balance.Currency].high = market.High
+                            coins[balance.Currency].low = market.Low
+                        }
+                    })
 
-            bittrex.getbalances((data) => {
-                arrayBittrex.push(bitbar.sep);
-                arrayBittrex.push({
-                    text: "Bittrex",
-                    color: COLOR_BLUE,
-                    font: FONT
-                });
+                    bittrex.getorderhistory({}, dataOrders => {
+                        var orders = dataOrders.result.reverse()
 
-                let balances = []
-                data.result.forEach(b => {
-                    if (b.Balance > 0 && b.Currency !== "BTC") {
-                        balances.push({
-                            name: b.Currency,
-                            value: b.Balance
-                        });
-                    }
-                });
+                        orders.forEach(order => {
+                            let coin = coins[order.Exchange.split("-")[1]]
+                            let qty = order.Quantity - order.QuantityRemaining
+                            coin.orders += 1
+                            if (order.OrderType.includes("BUY")) {
+                                coin.avgBuy = (coin.qtyBuy * coin.avgBuy + qty * order.PricePerUnit) / (coin.qtyBuy + qty)
+                                coin.qtyBuy += qty
+                                coin.lastBuy = order.PricePerUnit
+                                coin.lastQty = qty
+                            }
+                        })
 
-                //Let's create pairs for bittrex
-                var pairs = {};
-                balances.forEach(b => {
-                    pairs[b.name] = "BTC-" + b.name;
-                });
+                        if (!old.coins) {
+                            old.coins = coins
+                        }
 
-                //Get market summaries to do some calculus
-                bittrex.getmarketsummaries(data => {
-                    //Let's filter the summaries only for the currencies in your wallet
-                    let summaries = data.result.filter(summary => {
-                        let currency = summary.MarketName.split("-")[1]
-                        return pairs.hasOwnProperty(currency)
-                    });
+                        var res = []
+                        res.push(["Currency", "Evo", "24h %", "Price", "Value"])
 
-                    //
-                    balances.forEach(b => {
-                        //Let's get the market for this currency
-                        let i = summaries.findIndex(el => {
-                            return el.MarketName === pairs[b.name]
-                        });
-                        let market = summaries[i];
+                        var sub = []
+                        sub.push([])
 
-                        let average = (market.High + market.Low) / 2
-                        let btc = average * b.value;
+                        Object.values(coins)
+                            .sort((c1, c2) => c2.qtyCur * c2.price - c1.qtyCur * c1.price)
+                            .forEach(coin => {
+                                totalInBTC += parseFloat(coin.price * coin.qtyCur);
+                                let percent = 100 * ((coin.price - coin.prev) / coin.prev)
+                                let char = getChar(old.coins[coin.name].price, coin.price)
 
-                        totalInBTC += parseFloat(btc);
-                        totalBittrex += parseFloat(btc);
+                                res.push([coin.name, char, percent.toFixed(2) + " %", coin.price.toFixed(8) + " ₿", (coin.price * coin.qtyCur).toFixed(8) + " ₿"])
 
-                        arrayBittrex.push({
-                            text: `${b.name} ${b.value} = ${btc}₿`,
-                            color: COLOR_WHITE,
+                                sub.push([
+                                    [coin.name],
+                                    ["Price", coin.price.toFixed(8) + " ₿"],
+                                    ["<=>", (coin.price / rates.BTC).toFixed(2) + " €"],
+                                    ["Bid", coin.bid.toFixed(8) + " ₿"],
+                                    ["Ask", coin.ask.toFixed(8) + " ₿"],
+                                    ["Stats"],
+                                    ["Volume", coin.volume.toFixed(2) + " ₿"],
+                                    ["24h %", percent.toFixed(2) + " %"],
+                                    ["24h High", coin.high.toFixed(8) + " ₿"],
+                                    ["24h Low", coin.low.toFixed(8) + " ₿"],
+                                    ["Available"],
+                                    ["Qty", coin.qtyCur.toFixed(2) + "  "],
+                                    ["===", (coin.price * coin.qtyCur).toFixed(8) + " ₿"],
+                                    ["<=>", (coin.price * coin.qtyCur / rates.BTC).toFixed(2) + " €"],
+                                    ["Last Buy"],
+                                    ["Price", coin.lastBuy.toFixed(8) + " ₿"],
+                                    ["Qty", coin.lastQty.toFixed(2) + "  "],
+                                    ["===", (coin.lastQty * coin.lastBuy).toFixed(8) + " ₿"],
+                                    ["<=>", (coin.lastQty * coin.lastBuy / rates.BTC).toFixed(2) + " €"],
+                                    ["P\\L", ((coin.price - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
+                                    ["===", (coin.price * coin.lastQty - coin.lastBuy * coin.lastQty).toFixed(8) + " ₿"],
+                                    ["<=>", ((coin.price * coin.lastQty - coin.lastBuy * coin.lastQty) / rates.BTC).toFixed(2) + " €"],
+                                    ["Buy Avg"],
+                                    ["Price", coin.avgBuy.toFixed(8) + " ₿"],
+                                    ["Qty", coin.qtyBuy.toFixed(2) + "  "],
+                                    ["===", (coin.qtyBuy * coin.avgBuy).toFixed(8) + " ₿"],
+                                    // ["<=>", (coin.qtyBuy * coin.avgBuy / rates.BTC).toFixed(2) + " €"],
+                                    ["P\\L", ((coin.price - coin.avgBuy) / coin.avgBuy * 100).toFixed(2) + " %"]
+                                    // ["===", (coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy).toFixed(8) + " ₿"],
+                                    // ["<=>", ((coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy) / rates.BTC).toFixed(2) + " €"]
+                                ])
+                            })
+
+                        let lines = table(res, { align: ['l', 'c', 'r', 'l', 'l'] }).split("\n")
+                        arrayBitBar.push({
+                            text: lines[0],
+                            color: COLOR_GREY,
                             font: FONT,
-                            size: SMALL_SIZE
-                        });
-                    });
+                            size: SIZE,
+                        })
 
-                    var euros = (totalBittrex / rates.BTC).toFixed(2);
-                    arrayBittrex[1].text += ` (${euros}€)`;
-
-                    resolve(arrayBittrex);
-                });
-            });
-        }));
-    }
-
-    Promise.all(promises)
-        .then(arrays => {
-            arrays.insert(0, arrayBitBar);
-            var merged = [].concat.apply([], arrays);
-
-            merged.push(bitbar.sep)
-            merged.push({
-                text: `TOTAL = ${totalInBTC}₿`,
-                font: COLOR_GREY,
-                font: FONT
-            });
-
-            var euros = (totalInBTC / rates.BTC).toFixed(2);
-
-            merged.push({
-                text: `${euros}€`,
-                color: COLOR_GREY,
-                font: FONT
-            });
-            bitbar(merged);
-
-
+                        for (var i = 1; i < lines.length; i++) {
+                            var item = {
+                                text: lines[i],
+                                color: COLOR_WHITE,
+                                font: FONT,
+                                size: SIZE,
+                                submenu: []
+                            }
+                            var subLines = table(sub[i], { align: ['l', 'r'] }).split("\n")
+                            for (var j = 0; j < subLines.length; j++) {
+                                let item2 = {
+                                    text: subLines[j],
+                                    color: sub[i][j].length === 1 ? COLOR_GREY : COLOR_WHITE,
+                                    font: FONT,
+                                    size: SIZE
+                                }
+                                if (sub[i][j].length > 1)
+                                    item2.refresh = true
+                                item.submenu.push(item2)
+                            }
+                            arrayBitBar.push(item)
+                        }
+                        resolve(rates);
+                    })
+                })
+            })
         })
-        .catch(e => console.log(e));
+    }
+}).then(rates => {
 
-    Array.prototype.insert = function (index, item) {
-        this.splice(index, 0, item);
-    };
-})
+    arrayBitBar[0].text = getChar(old.totalInBTC, totalInBTC, 2) + " " + totalInBTC.toFixed(2) + " ₿"
+    arrayBitBar.push(bitbar.sep)
+
+    var priceBtc = 1 / rates.BTC
+    var euros = totalInBTC / rates.BTC;
+    var real = euros - config.initEur;
+    var percentBtc = (totalInBTC - config.initBtc) * 100 / config.initBtc
+    var percentEur = real * 100 / config.initEur
+
+    let result = []
+    result.push(["1 ₿", getChar(old.priceBtc, priceBtc, 2), priceBtc.toFixed(2) + " €"])
+    result.push(["Wallet", getChar(old.totalInBTC, totalInBTC), totalInBTC.toFixed(8) + " ₿"])
+    result.push(["<=>", getChar(old.euros, euros, 2), euros.toFixed(2) + " €"])
+    result.push(["₿ P\\L", getChar(old.percentBtc, percentBtc, 2), percentBtc.toFixed(2) + " %"])
+    result.push(["€ P\\L", getChar(old.percentEur, percentEur, 2), percentEur.toFixed(2) + " %"])
+    result.push(["===", getChar(old.real, real, 2), real.toFixed(2) + " €"])
+    arrayBitBar.push({
+        text: table(result, { align: ['l', 'l', 'r'] }),
+        color: COLOR_WHITE,
+        font: FONT,
+        size: SIZE,
+        refresh: true
+    });
+    bitbar(arrayBitBar);
+
+    let cache = {
+        totalInBTC: totalInBTC,
+        priceBtc: priceBtc,
+        percentBtc: percentBtc,
+        euros: euros,
+        real: real,
+        coins: coins
+    }
+    jsonfile.writeFileSync(config.cache, cache)
+
+}).catch(e => console.log(e));
+
+function getChar(oldVal, newVal, precision = 8) {
+    let char = "≃"
+    if (oldVal && oldVal.toFixed(precision) < newVal.toFixed(precision))
+        char = "↑"
+    else if (oldVal && oldVal.toFixed(precision) > newVal.toFixed(precision))
+        char = "↓"
+    return char;
+}
