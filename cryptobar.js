@@ -90,53 +90,60 @@ getExchangeRates().then(rates => {
                         }
 
                         var res = []
-                        res.push(["Currency", "Evo", "24h %", "Price", "Value"])
+                        res.push(["Currency", "Evo", "24h %", "Price", "Qty"])
 
                         var sub = []
                         sub.push([])
 
-                        Object.values(coins)
-                            .sort((c1, c2) => c2.qtyCur * c2.price - c1.qtyCur * c1.price)
-                            .forEach(coin => {
-                                totalInBTC += parseFloat(coin.price * coin.qtyCur);
-                                let percent = 100 * ((coin.price - coin.prev) / coin.prev)
-                                let char = getChar(old.coins[coin.name].price, coin.price)
+                        let sorted = Object.values(coins).sort((c1, c2) => {
+                            let val = c2.qtyCur * c2.price - c1.qtyCur * c1.price
+                            if (val === 0) {
+                                let c1Per = 100 * ((c1.price - c1.prev) / c1.prev)
+                                let c2Per = 100 * ((c2.price - c2.prev) / c2.prev)
+                                return c2Per - c1Per
+                            }
+                            return val
+                        })
 
-                                res.push([coin.name, char, percent.toFixed(2) + " %", coin.price.toFixed(8) + " ₿", (coin.price * coin.qtyCur).toFixed(8) + " ₿"])
+                        sorted.forEach(coin => {
+                            totalInBTC += parseFloat(coin.price * coin.qtyCur);
+                            let percent = 100 * ((coin.price - coin.prev) / coin.prev)
+                            let char = getChar(old.coins[coin.name].price, coin.price)
 
-                                sub.push([
-                                    [coin.name],
-                                    ["Price", coin.price.toFixed(8) + " ₿"],
-                                    ["<=>", (coin.price / rates.BTC).toFixed(2) + " €"],
-                                    ["Bid", coin.bid.toFixed(8) + " ₿"],
-                                    ["Ask", coin.ask.toFixed(8) + " ₿"],
-                                    ["Stats"],
-                                    ["Volume", coin.volume.toFixed(2) + " ₿"],
-                                    ["24h %", percent.toFixed(2) + " %"],
-                                    ["24h High", coin.high.toFixed(8) + " ₿"],
-                                    ["24h Low", coin.low.toFixed(8) + " ₿"],
-                                    ["Available"],
-                                    ["Qty", coin.qtyCur.toFixed(2) + "  "],
-                                    ["===", (coin.price * coin.qtyCur).toFixed(8) + " ₿"],
-                                    ["<=>", (coin.price * coin.qtyCur / rates.BTC).toFixed(2) + " €"],
-                                    ["Last Buy"],
-                                    ["Price", coin.lastBuy.toFixed(8) + " ₿"],
-                                    ["Qty", coin.lastQty.toFixed(2) + "  "],
-                                    ["===", (coin.lastQty * coin.lastBuy).toFixed(8) + " ₿"],
-                                    ["<=>", (coin.lastQty * coin.lastBuy / rates.BTC).toFixed(2) + " €"],
-                                    ["P\\L", ((coin.price - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
-                                    ["===", (coin.price * coin.lastQty - coin.lastBuy * coin.lastQty).toFixed(8) + " ₿"],
-                                    ["<=>", ((coin.price * coin.lastQty - coin.lastBuy * coin.lastQty) / rates.BTC).toFixed(2) + " €"],
-                                    ["Buy Avg"],
-                                    ["Price", coin.avgBuy.toFixed(8) + " ₿"],
-                                    ["Qty", coin.qtyBuy.toFixed(2) + "  "],
-                                    ["===", (coin.qtyBuy * coin.avgBuy).toFixed(8) + " ₿"],
-                                    // ["<=>", (coin.qtyBuy * coin.avgBuy / rates.BTC).toFixed(2) + " €"],
-                                    ["P\\L", ((coin.price - coin.avgBuy) / coin.avgBuy * 100).toFixed(2) + " %"]
-                                    // ["===", (coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy).toFixed(8) + " ₿"],
-                                    // ["<=>", ((coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy) / rates.BTC).toFixed(2) + " €"]
-                                ])
-                            })
+                            res.push([coin.name, char, percent.toFixed(2) + " %", coin.price.toFixed(8) + " ₿", (coin.price * coin.qtyCur).toFixed(8) + " ₿"])
+                            sub.push([
+                                [coin.name],
+                                ["Price", coin.price.toFixed(8) + " ₿"],
+                                ["<=>", (coin.price / rates.BTC).toFixed(2) + " €"],
+                                ["Bid", coin.bid.toFixed(8) + " ₿"],
+                                ["Ask", coin.ask.toFixed(8) + " ₿"],
+                                ["Stats"],
+                                ["Volume", coin.volume.toFixed(2) + " ₿"],
+                                ["24h %", percent.toFixed(2) + " %"],
+                                ["24h High", coin.high.toFixed(8) + " ₿"],
+                                ["24h Low", coin.low.toFixed(8) + " ₿"],
+                                ["Available"],
+                                ["Qty", coin.qtyCur.toFixed(2) + "  "],
+                                ["===", (coin.price * coin.qtyCur).toFixed(8) + " ₿"],
+                                ["<=>", (coin.price * coin.qtyCur / rates.BTC).toFixed(2) + " €"],
+                                ["Last Buy"],
+                                ["Price", coin.lastBuy.toFixed(8) + " ₿"],
+                                ["Qty", coin.lastQty.toFixed(2) + "  "],
+                                ["===", (coin.lastQty * coin.lastBuy).toFixed(8) + " ₿"],
+                                ["<=>", (coin.lastQty * coin.lastBuy / rates.BTC).toFixed(2) + " €"],
+                                ["P\\L", ((coin.price - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
+                                ["===", (coin.price * coin.lastQty - coin.lastBuy * coin.lastQty).toFixed(8) + " ₿"],
+                                ["<=>", ((coin.price * coin.lastQty - coin.lastBuy * coin.lastQty) / rates.BTC).toFixed(2) + " €"],
+                                ["Buy Avg"],
+                                ["Price", coin.avgBuy.toFixed(8) + " ₿"],
+                                ["Qty", coin.qtyBuy.toFixed(2) + "  "],
+                                ["===", (coin.qtyBuy * coin.avgBuy).toFixed(8) + " ₿"],
+                                // ["<=>", (coin.qtyBuy * coin.avgBuy / rates.BTC).toFixed(2) + " €"],
+                                ["P\\L", ((coin.price - coin.avgBuy) / coin.avgBuy * 100).toFixed(2) + " %"]
+                                // ["===", (coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy).toFixed(8) + " ₿"],
+                                // ["<=>", ((coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy) / rates.BTC).toFixed(2) + " €"]
+                            ])
+                        })
 
                         let lines = table(res, { align: ['l', 'c', 'r', 'l', 'l'] }).split("\n")
                         arrayBitBar.push({
@@ -168,6 +175,10 @@ getExchangeRates().then(rates => {
                             }
                             arrayBitBar.push(item)
                         }
+
+                        let zeroIndex = sorted.findIndex(c => c.qtyCur === 0)
+                        arrayBitBar.splice(zeroIndex + 3, 0, bitbar.sep)
+
                         resolve(rates);
                     })
                 })
