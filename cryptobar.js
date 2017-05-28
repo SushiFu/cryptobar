@@ -50,10 +50,11 @@ getExchangeRates().then(rates => {
                             qtyBuy: 0,
                             lastBuy: 0,
                             lastQty: 0,
+                            sellOrder: 0,
+                            sellQty: 0,
                             price: 1,
                             bid: 1,
                             ask: 1,
-                            orders: 0,
                             volume: 0,
                             prev: 1,
                             high: 0,
@@ -76,110 +77,132 @@ getExchangeRates().then(rates => {
                         orders.forEach(order => {
                             let coin = coins[order.Exchange.split("-")[1]]
                             let qty = order.Quantity - order.QuantityRemaining
-                            coin.orders += 1
                             if (order.OrderType.includes("BUY")) {
                                 coin.avgBuy = (coin.qtyBuy * coin.avgBuy + qty * order.PricePerUnit) / (coin.qtyBuy + qty)
                                 coin.qtyBuy += qty
                                 coin.lastBuy = order.PricePerUnit
                                 coin.lastQty = qty
                             }
-                        })
-
-                        if (!old.coins) {
-                            old.coins = coins
-                        }
-
-                        var res = []
-                        res.push(["Currency", "Evo", "24h %", "Price", "Qty"])
-
-                        var sub = []
-                        sub.push([])
-
-                        let sorted = Object.values(coins).sort((c1, c2) => {
-                            let val = c2.qtyCur * c2.price - c1.qtyCur * c1.price
-                            if (val === 0) {
-                                let c1Per = 100 * ((c1.price - c1.prev) / c1.prev)
-                                let c2Per = 100 * ((c2.price - c2.prev) / c2.prev)
-                                return c2Per - c1Per
+                            else {
+                                coin.sellOrder = order.PricePerUnit
+                                coin.sellQty = qty
                             }
-                            return val
                         })
 
-                        sorted.forEach(coin => {
-                            totalInBTC += parseFloat(coin.price * coin.qtyCur);
-                            let percent = 100 * ((coin.price - coin.prev) / coin.prev)
-                            let char = getChar(old.coins[coin.name].price, coin.price)
+                        bittrex.getopenorders({}, dataOpened => {
+                            var opened = dataOpened.result.reverse()
+                            opened.forEach(open => {
+                                let coin = coins[open.Exchange.split("-")[1]]
+                                if (open.OrderType.includes("SELL")) {
+                                    coin.sellOrder = open.Limit
+                                    coin.sellQty = open.QuantityRemaining
+                                }
+                            })
 
-                            res.push([coin.name, char, percent.toFixed(2) + " %", coin.price.toFixed(8) + " ₿", (coin.price * coin.qtyCur).toFixed(8) + " ₿"])
-                            sub.push([
-                                [coin.name],
-                                ["Price", coin.price.toFixed(8) + " ₿"],
-                                ["<=>", (coin.price / rates.BTC).toFixed(2) + " €"],
-                                ["Bid", coin.bid.toFixed(8) + " ₿"],
-                                ["Ask", coin.ask.toFixed(8) + " ₿"],
-                                ["Stats"],
-                                ["Volume", coin.volume.toFixed(2) + " ₿"],
-                                ["24h %", percent.toFixed(2) + " %"],
-                                ["24h High", coin.high.toFixed(8) + " ₿"],
-                                ["24h Low", coin.low.toFixed(8) + " ₿"],
-                                ["Available"],
-                                ["Qty", coin.qtyCur.toFixed(2) + "  "],
-                                ["===", (coin.price * coin.qtyCur).toFixed(8) + " ₿"],
-                                ["<=>", (coin.price * coin.qtyCur / rates.BTC).toFixed(2) + " €"],
-                                ["Last Buy"],
-                                ["Price", coin.lastBuy.toFixed(8) + " ₿"],
-                                ["Qty", coin.lastQty.toFixed(2) + "  "],
-                                ["===", (coin.lastQty * coin.lastBuy).toFixed(8) + " ₿"],
-                                ["<=>", (coin.lastQty * coin.lastBuy / rates.BTC).toFixed(2) + " €"],
-                                ["P\\L", ((coin.price - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
-                                ["===", (coin.price * coin.lastQty - coin.lastBuy * coin.lastQty).toFixed(8) + " ₿"],
-                                ["<=>", ((coin.price * coin.lastQty - coin.lastBuy * coin.lastQty) / rates.BTC).toFixed(2) + " €"],
-                                ["Buy Avg"],
-                                ["Price", coin.avgBuy.toFixed(8) + " ₿"],
-                                ["Qty", coin.qtyBuy.toFixed(2) + "  "],
-                                ["===", (coin.qtyBuy * coin.avgBuy).toFixed(8) + " ₿"],
-                                // ["<=>", (coin.qtyBuy * coin.avgBuy / rates.BTC).toFixed(2) + " €"],
-                                ["P\\L", ((coin.price - coin.avgBuy) / coin.avgBuy * 100).toFixed(2) + " %"]
-                                // ["===", (coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy).toFixed(8) + " ₿"],
-                                // ["<=>", ((coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy) / rates.BTC).toFixed(2) + " €"]
-                            ])
-                        })
+                            if (!old.coins) {
+                                old.coins = coins
+                            }
 
-                        let lines = table(res, { align: ['l', 'c', 'r', 'l', 'l'] }).split("\n")
-                        arrayBitBar.push({
-                            text: lines[0],
-                            color: COLOR_GREY,
-                            font: FONT,
-                            size: SIZE,
-                        })
+                            var res = []
+                            res.push(["Currency", "Evo", "24h %", "Price", "Qty"])
 
-                        for (var i = 1; i < lines.length; i++) {
-                            var item = {
-                                text: lines[i],
-                                color: COLOR_WHITE,
+                            var sub = []
+                            sub.push([])
+
+                            let sorted = Object.values(coins).sort((c1, c2) => {
+                                let val = c2.qtyCur * c2.price - c1.qtyCur * c1.price
+                                if (val === 0) {
+                                    let c1Per = 100 * ((c1.price - c1.prev) / c1.prev)
+                                    let c2Per = 100 * ((c2.price - c2.prev) / c2.prev)
+                                    return c2Per - c1Per
+                                }
+                                return val
+                            })
+
+                            sorted.forEach(coin => {
+                                totalInBTC += parseFloat(coin.price * coin.qtyCur);
+                                let percent = 100 * ((coin.price - coin.prev) / coin.prev)
+                                let char = getChar(old.coins[coin.name].price, coin.price)
+
+                                res.push([coin.name, char, percent.toFixed(2) + " %", coin.price.toFixed(8) + " ₿", (coin.price * coin.qtyCur).toFixed(8) + " ₿"])
+                                sub.push([
+                                    [coin.name],
+                                    ["Price", coin.price.toFixed(8) + " ₿"],
+                                    ["<=>", (coin.price / rates.BTC).toFixed(2) + " €"],
+                                    ["Bid", coin.bid.toFixed(8) + " ₿"],
+                                    ["Ask", coin.ask.toFixed(8) + " ₿"],
+                                    ["Stats"],
+                                    ["Volume", coin.volume.toFixed(2) + " ₿"],
+                                    ["24h %", percent.toFixed(2) + " %"],
+                                    ["24h High", coin.high.toFixed(8) + " ₿"],
+                                    ["24h Low", coin.low.toFixed(8) + " ₿"],
+                                    ["Available"],
+                                    ["Qty", coin.qtyCur.toFixed(2) + "  "],
+                                    ["===", (coin.price * coin.qtyCur).toFixed(8) + " ₿"],
+                                    ["<=>", (coin.price * coin.qtyCur / rates.BTC).toFixed(2) + " €"],
+                                    ["Last Buy"],
+                                    ["Price", coin.lastBuy.toFixed(8) + " ₿"],
+                                    ["Qty", coin.lastQty.toFixed(2) + "  "],
+                                    ["===", (coin.lastQty * coin.lastBuy).toFixed(8) + " ₿"],
+                                    ["<=>", (coin.lastQty * coin.lastBuy / rates.BTC).toFixed(2) + " €"],
+                                    ["P\\L", ((coin.price - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
+                                    ["===", (coin.price * coin.lastQty - coin.lastBuy * coin.lastQty).toFixed(8) + " ₿"],
+                                    ["<=>", ((coin.price * coin.lastQty - coin.lastBuy * coin.lastQty) / rates.BTC).toFixed(2) + " €"],
+                                    ["Sell Order"],
+                                    ["Price", coin.sellOrder.toFixed(8) + " ₿"],
+                                    ["Qty", coin.sellQty.toFixed(2) + "  "],
+                                    ["===", (coin.sellQty * coin.sellOrder).toFixed(8) + " ₿"],
+                                    ["<=>", (coin.sellQty * coin.sellOrder / rates.BTC).toFixed(2) + " €"],
+                                    ["P\\L", ((coin.sellOrder - coin.lastBuy) / coin.lastBuy * 100).toFixed(2) + " %"],
+                                    ["===", (coin.sellOrder * coin.sellQty - coin.lastBuy * coin.sellQty).toFixed(8) + " ₿"],
+                                    ["<=>", ((coin.sellOrder * coin.sellQty - coin.lastBuy * coin.sellQty) / rates.BTC).toFixed(2) + " €"],
+                                    ["Buy Avg"],
+                                    ["Price", coin.avgBuy.toFixed(8) + " ₿"],
+                                    ["Qty", coin.qtyBuy.toFixed(2) + "  "],
+                                    ["===", (coin.qtyBuy * coin.avgBuy).toFixed(8) + " ₿"],
+                                    // ["<=>", (coin.qtyBuy * coin.avgBuy / rates.BTC).toFixed(2) + " €"],
+                                    ["P\\L", ((coin.price - coin.avgBuy) / coin.avgBuy * 100).toFixed(2) + " %"]
+                                    // ["===", (coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy).toFixed(8) + " ₿"],
+                                    // ["<=>", ((coin.price * coin.qtyBuy - coin.avgBuy * coin.qtyBuy) / rates.BTC).toFixed(2) + " €"]
+                                ])
+                            })
+
+                            let lines = table(res, { align: ['l', 'c', 'r', 'l', 'l'] }).split("\n")
+                            arrayBitBar.push({
+                                text: lines[0],
+                                color: COLOR_GREY,
                                 font: FONT,
                                 size: SIZE,
-                                submenu: []
-                            }
-                            var subLines = table(sub[i], { align: ['l', 'r'] }).split("\n")
-                            for (var j = 0; j < subLines.length; j++) {
-                                let item2 = {
-                                    text: subLines[j],
-                                    color: sub[i][j].length === 1 ? COLOR_GREY : COLOR_WHITE,
+                            })
+
+                            for (var i = 1; i < lines.length; i++) {
+                                var item = {
+                                    text: lines[i],
+                                    color: COLOR_WHITE,
                                     font: FONT,
-                                    size: SIZE
+                                    size: SIZE,
+                                    submenu: []
                                 }
-                                if (sub[i][j].length > 1)
-                                    item2.refresh = true
-                                item.submenu.push(item2)
+                                var subLines = table(sub[i], { align: ['l', 'r'] }).split("\n")
+                                for (var j = 0; j < subLines.length; j++) {
+                                    let item2 = {
+                                        text: subLines[j],
+                                        color: sub[i][j].length === 1 ? COLOR_GREY : COLOR_WHITE,
+                                        font: FONT,
+                                        size: SIZE
+                                    }
+                                    if (sub[i][j].length > 1)
+                                        item2.refresh = true
+                                    item.submenu.push(item2)
+                                }
+                                arrayBitBar.push(item)
                             }
-                            arrayBitBar.push(item)
-                        }
 
-                        let zeroIndex = sorted.findIndex(c => c.qtyCur === 0)
-                        arrayBitBar.splice(zeroIndex + 3, 0, bitbar.sep)
+                            let zeroIndex = sorted.findIndex(c => c.qtyCur === 0)
+                            arrayBitBar.splice(zeroIndex + 3, 0, bitbar.sep)
 
-                        resolve(rates);
+                            resolve(rates);
+                        })
                     })
                 })
             })
