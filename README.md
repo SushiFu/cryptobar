@@ -1,44 +1,26 @@
 # Cryptobar
-BitBar plugin that check every given time the current status of your currencies in [Kraken](https://kraken.com), [Poloniex](https://poloniex.com) or [Bittrex](https://bittrex.com)
+BitBar plugin which gives you some stats about your assets in [Bittrex](https://bittrex.com)
 
 ![Screenshot](screenshot.png)
 
-### How to install
-```
-git clone https://github.com/johnoppenheimer/cryptobar.git
-cd cryptobar
-npm install
-```
+### Setup
+- Install [Bitbar](https://github.com/matryer/bitbar/releases)
+- Install [Fira Code](https://github.com/tonsky/FiraCode/releases) Font
+```bash
+$ git clone https://github.com/SushiFu/cryptobar.git
+$ cd cryptobar
+$ npm install
 
-### Adding your API Keys
-I will assume that you have you keys from Kraken or Poloniex. Open `config.js` and add your keys like that:
-```javascript
-module.exports = {
-    platforms: {
-        kraken: {
-            key: "mySuperKey",
-            secret: "mySuperSecret"
-        },
-        poloniex: {
-            key: "mySuperKey",
-            secret: "mySuperSecret"
-        }
-    }
-}
-```
+$ echo INIT_BTC=YOUR_INITIAL_BTC_INVEST > .env
+$ echo INIT_EUR=YOUR_INITIAL_EUR_INVEST >> .env
+$ echo BITTREX_API_KEY=YOUR_BITTREX_API_KEY >> .env
+$ echo BITTREX_SECRET_KEY=YOUR_BITTREX_SECRET_KEY >> .env
 
-### Configuration with BitBar
-BitBar will try to read files that won't work (like a nice package.json), so to avoid that you can create a folder in your home (like `~/.bitbar`), and create symbolic link to `cryptobar.js` like:
+$ mkdir -p ~/.bitbar/plugins
+$ ln -s $PWD/cryptobar.js ~/.bitbar/plugins/cryptobar.10m.js # The `10m` in the filename is important because it say to BitBar what is the refresh rate, but you can put any value
+$ defaults write com.matryer.BitBar pluginsDirectory "~/.bitbar/plugins"
 ```
-ln -s /path/to/the/repo/cryptobar.js ~/.bitbar/plugins/cryptobar.5m.js
-```
-The `5m` in the filename is important because it say to BitBar what is the refresh rate, but you can put any value like `30s` for every 30 seconds or `10m` for every ten minutes
-
-Then you need to set the plugins path to BitBar
-```
-defaults write com.matryer.BitBar pluginsDirectory "~/.bitbar/plugins"
-```
-Quit and relaunch BitBar and you should be good!
+- (Re)Start Bitbar
 
 ### LICENSE
 MIT
