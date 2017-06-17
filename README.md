@@ -17,7 +17,8 @@ $ echo BITTREX_API_KEY=YOUR_BITTREX_API_KEY >> .env
 $ echo BITTREX_SECRET_KEY=YOUR_BITTREX_SECRET_KEY >> .env
 
 $ mkdir -p ~/.bitbar/plugins
-$ ln -s $PWD/cryptobar.js ~/.bitbar/plugins/cryptobar.10m.js # The `10m` in the filename is important because it say to BitBar what is the refresh rate, but you can put any value
+$ ln -s $PWD/cryptobar.js ~/.bitbar/plugins/cryptobar.10m.js
+# The `10m` in the filename is important because it say to BitBar what is the refresh rate, but you can put any value
 $ defaults write com.matryer.BitBar pluginsDirectory "~/.bitbar/plugins"
 ```
 - (Re)Start Bitbar
